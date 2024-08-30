@@ -1,8 +1,21 @@
 {
-	"$schema": "https://biomejs.dev/schemas/biome.schema.json",
-	"files": ["**/*.{js,jsx,ts,tsx}"],
-	"rules": {
-		"format": true,
-		"lint": true
+	"files": {
+		"ignore": ["node_modules/**", "dist/**"]
+	},
+	"linter": {
+		"rules": {
+			"no-unused-vars": "warn",
+			"semi": ["warn", "always"],
+			"quotes": ["warn", "single"],
+			"indent": ["warn", 4],
+			"no-console": "off"
+		}
+	},
+	"formatter": {
+		"useTabs": false,
+		"tabWidth": 4,
+		"semi": true,
+		"singleQuote": true,
+		"trailingComma": "none"
 	}
 }

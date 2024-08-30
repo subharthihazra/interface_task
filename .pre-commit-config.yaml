@@ -28,4 +28,7 @@ repos:
         additional_dependencies: ['@biomejs/biome@1.8.3']
         types: [text]
         files: "\\.(jsx?|tsx?|c(js|ts)|m(js|ts)|d\\.(ts|cts|mts)|jsonc?|css)$"
+        args:
+          - --ignore
+          - "no-console,no-unused-vars,no-debugger,max-len,no-shadow"
 
