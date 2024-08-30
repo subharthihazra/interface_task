@@ -1,0 +1,57 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-format:
+    name: Lint and Format Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies for frontend
+        working-directory: ./frontend
+        run: |
+          npm install
+
+      - name: Run Biome checks for frontend
+        working-directory: ./frontend
+        run: |
+          npx biome check .
+
+      - name: Run Biome format for frontend
+        working-directory: ./frontend
+        run: |
+          npx biome format .
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies for backend
+        working-directory: ./backend
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Biome checks for backend
+        working-directory: ./backend
+        run: |
+          npx biome check .
+
+      - name: Run Biome format for backend
+        working-directory: ./backend
+        run: |
+          npx biome format .
