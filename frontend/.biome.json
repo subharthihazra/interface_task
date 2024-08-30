@@ -1,0 +1,8 @@
+{
+  "$schema": "https://biomejs.dev/schemas/biome.schema.json",
+  "files": ["**/*.{js,jsx,ts,tsx}"],
+  "rules": {
+    "format": true,
+    "lint": true
+  }
+}
