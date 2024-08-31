@@ -5,6 +5,7 @@ app = FastAPI()
 
 app.include_router(api_router)
 
+
 # Entry point for the application
 if __name__ == "__main__":
     import uvicorn

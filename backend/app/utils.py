@@ -1,6 +1,7 @@
 import logging
 
 import pandas as pd
+from app.database import engine
 from fastapi import HTTPException
 
 logging.basicConfig(filename="app/logs/elt_process.log", level=logging.INFO)
@@ -18,6 +19,8 @@ async def process_files(payment_report, mtr):
 
         print("dddddddddddddddd")
         print(merged_df)
+
+        await store_merged_db(merged_df)
 
         logging.info("Data uploaded and processed successfully")
         return {"message": "Files uploaded and processed successfully"}
@@ -125,3 +128,10 @@ def map_payment_row(row):
         "Order Date": "",
         "Payment Date": row.get("date/time", ""),
     }
+
+
+async def store_merged_db(df):
+    try:
+        df.to_sql("merged_data", engine, if_exists="replace", index=False)
+    except Exception as e:
+        logging.error(f"Error storing data to db: {e}")
