@@ -17,9 +17,6 @@ async def process_files(payment_report, mtr):
 
         merged_df = await generate_merged(mtr_df, payment_df)
 
-        print("dddddddddddddddd")
-        print(merged_df)
-
         await store_merged_db(merged_df)
         await transform_merged_data_and_store_db(merged_df)
 
@@ -47,6 +44,9 @@ async def process_mtr(mtr_df):
         # mtr_df.to_csv("app/uploaded_files/Transformed_MTR.csv", index=False)
     except Exception as e:
         logging.error(f"Error processing mtr file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing mtr file: {str(e)}"
+        )
 
 
 async def process_pr(payment_df):
@@ -74,6 +74,9 @@ async def process_pr(payment_df):
         # )
     except Exception as e:
         logging.error(f"Error processing payment report file: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing payment report file: {str(e)}"
+        )
 
 
 async def generate_merged(mtr_df, payment_df):
@@ -103,6 +106,9 @@ async def generate_merged(mtr_df, payment_df):
 
     except Exception as e:
         logging.error(f"Error merging report files: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error merging report files: {str(e)}"
+        )
 
 
 def map_mtr_row(row):
@@ -136,13 +142,26 @@ async def store_merged_db(df):
         df.to_sql("merged_data", engine, if_exists="replace", index=False)
     except Exception as e:
         logging.error(f"Error storing data to db: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error storing data to db: {str(e)}"
+        )
 
 
 async def transform_merged_data_and_store_db(df):
     try:
-        filtered_df = df[df["Order Id"].notna()]
 
-        df["Net Amount"] = df["Net Amount"].str.replace(",", "").astype(float)
+        df["Net Amount"] = (
+            df["Net Amount"].str.replace(",", "").astype(float)
+            if len(df["Net Amount"].str.strip()) == 0
+            else 0
+        )
+        df["Invoice Amount"] = (
+            df["Invoice Amount"].str.replace(",", "").astype(float)
+            if len(df["Invoice Amount"].str.strip()) == 0
+            else 0
+        )
+
+        filtered_df = df[df["Order Id"].notna()]
 
         summary_df = (
             df[df["Order Id"].isna()]
@@ -155,41 +174,8 @@ async def transform_merged_data_and_store_db(df):
             "transaction_summary", engine, if_exists="replace", index=False
         )
 
-        def classify_transactions(row):
-            if pd.isna(row["Order Id"]):
-                return "No Order ID"
-            elif row["Transaction Type"] == "Return" and pd.notna(
-                row["Invoice Amount"]
-            ):
-                return "Return"
-            elif (
-                row["Transaction Type"] == "Payment"
-                and pd.notna(row["Net Amount"])
-                and float(row["Net Amount"].replace(",", "")) < 0
-            ):
-                return "Negative Payout"
-            elif (
-                pd.notna(row["Order Id"])
-                and pd.notna(row["Net Amount"])
-                and pd.notna(row["Invoice Amount"])
-            ):
-                return "Order & Payment Received"
-            elif (
-                pd.notna(row["Order Id"])
-                and pd.notna(row["Net Amount"])
-                and pd.isna(row["Invoice Amount"])
-            ):
-                return "Order Not Applicable but Payment Received"
-            elif (
-                pd.notna(row["Order Id"])
-                and pd.isna(row["Net Amount"])
-                and pd.notna(row["Invoice Amount"])
-            ):
-                return "Payment Pending"
-            else:
-                return "Unclassified"
-
         filtered_df["Classification"] = filtered_df.apply(classify_transactions, axis=1)
+        # print("dggggggggggggggggggggggggggggss")
 
         filtered_df.to_sql("classified_data", engine, if_exists="replace", index=False)
 
@@ -228,34 +214,9 @@ async def transform_merged_data_and_store_db(df):
             "payment_pending", engine, if_exists="replace", index=False
         )
 
-        def check_tolerance(row):
-            if pd.notna(row["Net Amount"]) and pd.notna(row["Invoice Amount"]):
-                pna = row["Net Amount"]
-                invoice_amount = row["Invoice Amount"]
-                percentage = (pna / invoice_amount) * 100
-                if 0 < pna < 300:
-                    return (
-                        "Within Tolerance" if percentage > 50 else "Tolerance Breached"
-                    )
-                elif 301 < pna < 500:
-                    return (
-                        "Within Tolerance" if percentage > 45 else "Tolerance Breached"
-                    )
-                elif 501 < pna < 900:
-                    return (
-                        "Within Tolerance" if percentage > 43 else "Tolerance Breached"
-                    )
-                elif 901 < pna < 1500:
-                    return (
-                        "Within Tolerance" if percentage > 38 else "Tolerance Breached"
-                    )
-                elif pna > 1500:
-                    return (
-                        "Within Tolerance" if percentage > 30 else "Tolerance Breached"
-                    )
-            return "No Invoice Amount"
-
         filtered_df["Tolerance"] = filtered_df.apply(check_tolerance, axis=1)
+
+        # print("dggggwwwwwwwwwwwwgss")
 
         tolerance_data = filtered_df[
             [
@@ -271,5 +232,63 @@ async def transform_merged_data_and_store_db(df):
             "tolerance_data", engine, if_exists="replace", index=False
         )
 
+        # print("xxx",tolerance_data)
+
     except Exception as e:
-        logging.error(f"Error transming data to db: {e}")
+        logging.error(f"Error transforming data to db: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error transforming data to db: {str(e)}"
+        )
+
+
+def classify_transactions(row):
+    if pd.isna(row["Order Id"]):
+        return "No Order ID"
+    elif row["Transaction Type"] == "Return" and pd.notna(row["Invoice Amount"]):
+        return "Return"
+    elif (
+        row["Transaction Type"] == "Payment"
+        and pd.notna(row["Net Amount"])
+        and float(row["Net Amount"]) < 0
+    ):
+        return "Negative Payout"
+    elif (
+        pd.notna(row["Order Id"])
+        and pd.notna(row["Net Amount"])
+        and pd.notna(row["Invoice Amount"])
+    ):
+        return "Order & Payment Received"
+    elif (
+        pd.notna(row["Order Id"])
+        and pd.notna(row["Net Amount"])
+        and pd.isna(row["Invoice Amount"])
+    ):
+        return "Order Not Applicable but Payment Received"
+    elif (
+        pd.notna(row["Order Id"])
+        and pd.isna(row["Net Amount"])
+        and pd.notna(row["Invoice Amount"])
+    ):
+        return "Payment Pending"
+    else:
+        return "Unclassified"
+
+
+def check_tolerance(row):
+    if pd.notna(row["Net Amount"]) and pd.notna(row["Invoice Amount"]):
+        pna = row["Net Amount"]
+        invoice_amount = row["Invoice Amount"]
+        if invoice_amount == 0:
+            return
+        percentage = (pna / invoice_amount) * 100
+        if 0 < pna < 300:
+            return "Within Tolerance" if percentage > 50 else "Tolerance Breached"
+        elif 301 < pna < 500:
+            return "Within Tolerance" if percentage > 45 else "Tolerance Breached"
+        elif 501 < pna < 900:
+            return "Within Tolerance" if percentage > 43 else "Tolerance Breached"
+        elif 901 < pna < 1500:
+            return "Within Tolerance" if percentage > 38 else "Tolerance Breached"
+        elif pna > 1500:
+            return "Within Tolerance" if percentage > 30 else "Tolerance Breached"
+    return "No Invoice Amount"
