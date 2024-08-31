@@ -8,12 +8,16 @@ logging.basicConfig(filename="app/logs/elt_process.log", level=logging.INFO)
 
 async def process_files(payment_report, mtr):
     try:
-        payment_df = pd.read_csv(payment_report.file)
-        print(payment_report.file)
         mtr_df = pd.read_excel(mtr.file)
+        payment_df = pd.read_csv(payment_report.file)
 
-        await process_mtr(mtr_df)
-        await process_pr(payment_df)
+        mtr_df = await process_mtr(mtr_df)
+        payment_df = await process_pr(payment_df)
+
+        merged_df = await generate_merged(mtr_df, payment_df)
+
+        print("dddddddddddddddd")
+        print(merged_df)
 
         logging.info("Data uploaded and processed successfully")
         return {"message": "Files uploaded and processed successfully"}
@@ -34,7 +38,9 @@ async def process_mtr(mtr_df):
             "FreeReplacement", "Return"
         )
 
-        mtr_df.to_csv("app/uploaded_files/Transformed_MTR.csv", index=False)
+        return mtr_df
+
+        # mtr_df.to_csv("app/uploaded_files/Transformed_MTR.csv", index=False)
     except Exception as e:
         logging.error(f"Error processing mtr file: {e}")
 
@@ -57,8 +63,65 @@ async def process_pr(payment_df):
 
         payment_df["Transaction Type"] = "Payment"
 
-        payment_df.to_csv(
-            "app/uploaded_files/Transformed_Payment_Report.csv", index=False
-        )
+        return payment_df
+
+        # payment_df.to_csv(
+        #     "app/uploaded_files/Transformed_Payment_Report.csv", index=False
+        # )
     except Exception as e:
         logging.error(f"Error processing payment report file: {e}")
+
+
+async def generate_merged(mtr_df, payment_df):
+    try:
+        # print("fff",mtr_df,payment_df)
+        columns = [
+            "Order Id",
+            "Transaction Type",
+            "Payment Type",
+            "Invoice Amount",
+            "Net Amount",
+            "P_Description",
+            "Order Date",
+            "Payment Date",
+        ]
+        df = pd.DataFrame(columns=columns)
+
+        mtr_rows = [map_mtr_row(row) for _, row in mtr_df.iterrows()]
+        payment_rows = [map_payment_row(row) for _, row in payment_df.iterrows()]
+
+        mtr_df_final = pd.DataFrame(mtr_rows, columns=columns)
+        payment_df_final = pd.DataFrame(payment_rows, columns=columns)
+
+        df = pd.concat([mtr_df_final, payment_df_final], ignore_index=True)
+
+        return df
+
+    except Exception as e:
+        logging.error(f"Error merging report files: {e}")
+
+
+def map_mtr_row(row):
+    return {
+        "Order Id": row.get("Order Id", ""),
+        "Transaction Type": row.get("Transaction Type", ""),
+        "Payment Type": "",
+        "Invoice Amount": row.get("Invoice Amount", ""),
+        "Net Amount": "",
+        "P_Description": "",
+        "Order Date": row.get("Order Date", ""),
+        "Payment Date": "",
+    }
+
+
+def map_payment_row(row):
+    return {
+        "Order Id": row.get("order id", ""),
+        "Transaction Type": row.get("Transaction Type", ""),
+        "Payment Type": row.get("Payment Type", ""),
+        "Invoice Amount": "",
+        "Net Amount": row.get("total", ""),
+        "P_Description": row.get("description", ""),
+        "Order Date": "",
+        "Payment Date": row.get("date/time", ""),
+    }
