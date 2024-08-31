@@ -19,6 +19,13 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
+        name: flake8
+        entry: flake8
+        language: python
+        types: [python]
+        args:
+          - --max-line-length=120
+          - --ignore=E203,W503,E501,F401
         language_version: python3.11
         
   - repo: https://github.com/biomejs/pre-commit
@@ -31,4 +38,3 @@ repos:
         args:
           - --ignore
           - "no-console,no-unused-vars,no-debugger,max-len,no-shadow"
-
